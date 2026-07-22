@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class MinesweeperControllerTest {
     @Test
@@ -43,6 +44,29 @@ class MinesweeperControllerTest {
         fixture.clock.now = 2_000_000
         fixture.controller.dispatch(GameIntent.Tick)
         assertEquals(1_234, fixture.controller.state.elapsedSeconds)
+    }
+
+    @Test
+    fun undoLossRestoresTheRunningGameAndResumesThePausedTimer() {
+        val fixture = fixture()
+        fixture.controller.dispatch(GameIntent.Reveal(CellPosition(1, 1)))
+        fixture.clock.now = 4_250
+        fixture.controller.dispatch(GameIntent.Reveal(CellPosition(0, 0)))
+
+        assertEquals(GamePhase.Lost, fixture.controller.state.phase)
+        assertEquals(4, fixture.controller.state.elapsedSeconds)
+        assertTrue(fixture.controller.state.canUndo)
+
+        fixture.clock.now = 10_000
+        fixture.controller.dispatch(GameIntent.Undo)
+
+        assertEquals(GamePhase.Running, fixture.controller.state.phase)
+        assertEquals(4, fixture.controller.state.elapsedSeconds)
+        assertFalse(fixture.controller.state.canUndo)
+
+        fixture.clock.now = 11_000
+        fixture.controller.dispatch(GameIntent.Tick)
+        assertEquals(5, fixture.controller.state.elapsedSeconds)
     }
 
     @Test

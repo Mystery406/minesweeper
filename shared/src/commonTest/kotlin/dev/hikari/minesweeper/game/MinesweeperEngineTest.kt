@@ -118,12 +118,17 @@ class MinesweeperEngineTest {
         engine.reveal(cell(1, 1))
         engine.cycleMark(cell(0, 0))
         engine.cycleMark(cell(0, 1))
+        val beforeChord = engine.snapshot()
 
         engine.chord(cell(1, 1))
 
         assertEquals(GamePhase.Lost, engine.phase)
         assertEquals(CellViewState.ExplodedMine, engine.snapshot().cellAt(cell(2, 2)))
         assertEquals(CellViewState.WrongFlag, engine.snapshot().cellAt(cell(0, 1)))
+        assertTrue(engine.snapshot().canUndo)
+
+        assertTrue(engine.undoLoss().changed)
+        assertEquals(beforeChord, engine.snapshot())
     }
 
     @Test
@@ -132,12 +137,18 @@ class MinesweeperEngineTest {
         engine.reveal(cell(1, 1))
         engine.cycleMark(cell(0, 1))
         engine.cycleMark(cell(2, 2))
+        val beforeLoss = engine.snapshot()
         engine.reveal(cell(0, 0))
 
         val snapshot = engine.snapshot()
         assertEquals(CellViewState.ExplodedMine, snapshot.cellAt(cell(0, 0)))
         assertEquals(CellViewState.WrongFlag, snapshot.cellAt(cell(0, 1)))
         assertEquals(CellViewState.Covered(Mark.Flag), snapshot.cellAt(cell(2, 2)))
+        assertTrue(snapshot.canUndo)
+
+        assertTrue(engine.undoLoss().changed)
+        assertEquals(beforeLoss, engine.snapshot())
+        assertFalse(engine.undoLoss().changed)
     }
 
     @Test

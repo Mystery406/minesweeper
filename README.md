@@ -9,6 +9,7 @@ The game includes the classic Beginner, Intermediate, and Expert fields, validat
 - Pointer: primary click reveals, secondary click changes the mark, and middle or primary+secondary click chords a revealed clue.
 - Touch: tap reveals, long press changes the mark, and tapping a revealed clue chords it.
 - Restart with the face button. F2 also restarts on targets that deliver the key event.
+- After detonating a mine, choose Undo Last Move from the Game menu or use the visible undo button to return to the position before the losing move.
 
 ## Run
 

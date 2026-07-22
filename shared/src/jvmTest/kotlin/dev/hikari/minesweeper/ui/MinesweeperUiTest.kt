@@ -218,6 +218,27 @@ class MinesweeperUiTest {
     }
 
     @Test
+    fun lossShowsUndoButtonThatRestoresThePreviousPosition() = runComposeUiTest {
+        val controller = controller()
+        setContent { MinesweeperScreen(controller) }
+
+        onNodeWithTag("cell_1_1").performClick()
+        onNodeWithTag("cell_0_0").performClick()
+        waitForIdle()
+
+        assertEquals(GamePhase.Lost, controller.state.phase)
+        assertEquals(CellViewState.ExplodedMine, controller.state.cellAt(CellPosition(0, 0)))
+        onNodeWithTag("undo_button").performClick()
+        waitForIdle()
+
+        assertEquals(GamePhase.Running, controller.state.phase)
+        assertEquals(
+            CellViewState.Covered(Mark.None),
+            controller.state.cellAt(CellPosition(0, 0)),
+        )
+    }
+
+    @Test
     fun desktopRendererContainsClassicPaletteAndProducesVisualArtifact() = runComposeUiTest {
         val controller = controller()
         setContent {

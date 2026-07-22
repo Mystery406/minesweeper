@@ -33,6 +33,7 @@ data class GameSnapshot(
     val flagCount: Int,
     val remainingMineCount: Int,
     val revealedSafeCount: Int,
+    val canUndo: Boolean,
 ) {
     fun cellAt(position: CellPosition): CellViewState {
         require(position.row in 0 until config.height && position.column in 0 until config.width)

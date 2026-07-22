@@ -55,10 +55,12 @@ import dev.hikari.minesweeper.session.GameUiState
 import dev.hikari.minesweeper.session.MinesweeperController
 import kotlinx.coroutines.delay
 import minesweeper.shared.generated.resources.Res
+import minesweeper.shared.generated.resources.action_undo
 import minesweeper.shared.generated.resources.face_restart
 import minesweeper.shared.generated.resources.menu_best_times
 import minesweeper.shared.generated.resources.menu_game
 import minesweeper.shared.generated.resources.menu_new_game
+import minesweeper.shared.generated.resources.menu_undo
 import minesweeper.shared.generated.resources.mine_counter_description
 import minesweeper.shared.generated.resources.selected_difficulty
 import minesweeper.shared.generated.resources.status_lost
@@ -119,6 +121,7 @@ fun MinesweeperScreen(
         ClassicMenuBar(
             state = state,
             onRestart = { controller.dispatch(GameIntent.Restart) },
+            onUndo = { controller.dispatch(GameIntent.Undo) },
             onSelectDifficulty = { controller.dispatch(GameIntent.SelectDifficulty(it)) },
             onOpenCustom = { dialog = OpenDialog.Custom },
             onOpenBestTimes = { dialog = OpenDialog.BestTimes },
@@ -212,6 +215,7 @@ private fun StatusPanel(
 private fun ClassicMenuBar(
     state: GameUiState,
     onRestart: () -> Unit,
+    onUndo: () -> Unit,
     onSelectDifficulty: (Difficulty) -> Unit,
     onOpenCustom: () -> Unit,
     onOpenBestTimes: () -> Unit,
@@ -260,6 +264,14 @@ private fun ClassicMenuBar(
                             expanded = false
                             onRestart()
                         }
+                        MenuItem(
+                            text = stringResource(Res.string.menu_undo),
+                            enabled = state.canUndo,
+                            testTag = "menu_undo",
+                        ) {
+                            expanded = false
+                            onUndo()
+                        }
                         MenuSeparator()
                         listOf(
                             Difficulty.Beginner,
@@ -305,7 +317,21 @@ private fun ClassicMenuBar(
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f),
         )
-        Text(text = status, color = Color.Black, fontSize = 13.sp)
+        if (state.canUndo) {
+            ClassicButton(
+                onClick = onUndo,
+                modifier = Modifier.height(30.dp).testTag("undo_button"),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.action_undo),
+                    color = Color.Black,
+                    fontSize = 13.sp,
+                )
+            }
+        } else {
+            Text(text = status, color = Color.Black, fontSize = 13.sp)
+        }
     }
 }
 
@@ -314,6 +340,7 @@ private fun MenuItem(
     text: String,
     selected: Boolean = false,
     selectionItem: Boolean = false,
+    enabled: Boolean = true,
     testTag: String,
     onClick: () -> Unit,
 ) {
@@ -327,7 +354,12 @@ private fun MenuItem(
                 if (selectionItem) this.selected = selected
                 role = if (selectionItem) Role.RadioButton else Role.Button
             }
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            )
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -341,7 +373,11 @@ private fun MenuItem(
             }
         }
         Spacer(Modifier.width(8.dp))
-        Text(text, color = Color.Black, fontSize = 14.sp)
+        Text(
+            text,
+            color = if (enabled) Color.Black else ClassicPalette.Shadow,
+            fontSize = 14.sp,
+        )
     }
 }
 

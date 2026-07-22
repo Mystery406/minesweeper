@@ -19,6 +19,7 @@ sealed interface GameIntent {
     data class Reveal(val position: CellPosition) : GameIntent
     data class CycleMark(val position: CellPosition) : GameIntent
     data class Chord(val position: CellPosition) : GameIntent
+    data object Undo : GameIntent
     data object Restart : GameIntent
     data class SelectDifficulty(val difficulty: Difficulty) : GameIntent
     data class StartCustom(val config: BoardConfig) : GameIntent
@@ -36,6 +37,7 @@ data class GameUiState(
     val remainingMineCount: Int,
     val elapsedSeconds: Int,
     val bestTimes: Map<Difficulty, Int>,
+    val canUndo: Boolean,
 ) {
     val displayedMineCount: Int
         get() = remainingMineCount.coerceIn(MIN_DISPLAYED_MINES, MAX_DISPLAY_VALUE)
@@ -66,6 +68,7 @@ class MinesweeperController(
     private var engine = createEngine(selectedDifficulty.boardConfig(customConfig))
     private var startedAtMillis: Long? = null
     private var elapsedSeconds: Int = 0
+    private var lossTimerCheckpoint: LossTimerCheckpoint? = null
 
     var state: GameUiState by mutableStateOf(createUiState())
         private set
@@ -75,6 +78,7 @@ class MinesweeperController(
             is GameIntent.Reveal -> handleEngineAction(engine.reveal(intent.position))
             is GameIntent.CycleMark -> handleEngineAction(engine.cycleMark(intent.position))
             is GameIntent.Chord -> handleEngineAction(engine.chord(intent.position))
+            GameIntent.Undo -> undo()
             GameIntent.Restart -> restart()
             is GameIntent.SelectDifficulty -> selectDifficulty(intent.difficulty)
             is GameIntent.StartCustom -> startCustom(intent.config)
@@ -93,9 +97,27 @@ class MinesweeperController(
         }
         if (result.finished) {
             updateElapsed(now)
+            lossTimerCheckpoint = if (result.phaseAfter == GamePhase.Lost) {
+                startedAtMillis?.let { LossTimerCheckpoint(startedAtMillis = it, pausedAtMillis = now) }
+            } else {
+                null
+            }
             startedAtMillis = null
             if (result.phaseAfter == GamePhase.Won) updateBestTime()
         }
+        publish()
+    }
+
+    private fun undo() {
+        val result = engine.undoLoss()
+        if (!result.changed) return
+
+        val now = clock.nowMillis()
+        startedAtMillis = lossTimerCheckpoint?.let { checkpoint ->
+            val pausedDuration = (now - checkpoint.pausedAtMillis).coerceAtLeast(0)
+            checkpoint.startedAtMillis + pausedDuration
+        } ?: (now - elapsedSeconds.toLong() * MILLIS_PER_SECOND)
+        lossTimerCheckpoint = null
         publish()
     }
 
@@ -103,6 +125,7 @@ class MinesweeperController(
         engine.restart()
         startedAtMillis = null
         elapsedSeconds = 0
+        lossTimerCheckpoint = null
         publish()
     }
 
@@ -112,6 +135,7 @@ class MinesweeperController(
         engine = createEngine(difficulty.boardConfig(customConfig))
         startedAtMillis = null
         elapsedSeconds = 0
+        lossTimerCheckpoint = null
         publish()
     }
 
@@ -126,6 +150,7 @@ class MinesweeperController(
         engine = createEngine(customConfig)
         startedAtMillis = null
         elapsedSeconds = 0
+        lossTimerCheckpoint = null
         publish()
     }
 
@@ -176,8 +201,14 @@ class MinesweeperController(
             remainingMineCount = snapshot.remainingMineCount,
             elapsedSeconds = elapsedSeconds,
             bestTimes = bestTimes.toMap(),
+            canUndo = snapshot.canUndo,
         )
     }
+
+    private data class LossTimerCheckpoint(
+        val startedAtMillis: Long,
+        val pausedAtMillis: Long,
+    )
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L

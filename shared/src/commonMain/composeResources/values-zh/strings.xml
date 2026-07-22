@@ -2,6 +2,7 @@
     <string name="app_title">扫雷</string>
     <string name="menu_game">游戏</string>
     <string name="menu_new_game">开局</string>
+    <string name="menu_undo">复活</string>
     <string name="menu_best_times">最佳成绩…</string>
     <string name="menu_reset_best_times">重置最佳成绩</string>
     <string name="difficulty_beginner">初级</string>
@@ -26,6 +27,7 @@
     <string name="action_cancel">取消</string>
     <string name="action_close">关闭</string>
     <string name="action_reset">重置</string>
+    <string name="action_undo">复活</string>
     <string name="face_restart">重新开始</string>
     <string name="status_ready">准备</string>
     <string name="status_running">进行中</string>

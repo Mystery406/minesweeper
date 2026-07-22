@@ -17,6 +17,7 @@ class MinesweeperEngine(
     var revealedSafeCount: Int = 0
         private set
     private var detonatedIndex: Int = NO_CELL
+    private var lossCheckpoint: EngineCheckpoint? = null
 
     init {
         installNewLayout()
@@ -35,6 +36,7 @@ class MinesweeperEngine(
         }
 
         if (mines[index]) {
+            lossCheckpoint = createCheckpoint()
             lose(index)
         } else {
             revealSafeRegion(index)
@@ -88,11 +90,29 @@ class MinesweeperEngine(
 
         val mine = candidates.firstOrNull { mines[it] }
         if (mine != null) {
+            lossCheckpoint = createCheckpoint()
             lose(mine)
         } else {
             candidates.forEach(::revealSafeRegion)
             finishWinIfComplete()
         }
+        return EngineActionResult(phaseBefore, phase, changed = true)
+    }
+
+    fun undoLoss(): EngineActionResult {
+        val phaseBefore = phase
+        val checkpoint = lossCheckpoint
+        if (phase != GamePhase.Lost || checkpoint == null) return unchanged(phaseBefore)
+
+        checkpoint.mines.copyInto(mines)
+        checkpoint.adjacentMines.copyInto(adjacentMines)
+        checkpoint.revealed.copyInto(revealed)
+        checkpoint.marks.copyInto(marks)
+        phase = checkpoint.phase
+        flagCount = checkpoint.flagCount
+        revealedSafeCount = checkpoint.revealedSafeCount
+        detonatedIndex = checkpoint.detonatedIndex
+        lossCheckpoint = null
         return EngineActionResult(phaseBefore, phase, changed = true)
     }
 
@@ -106,6 +126,7 @@ class MinesweeperEngine(
         flagCount = 0
         revealedSafeCount = 0
         detonatedIndex = NO_CELL
+        lossCheckpoint = null
         installNewLayout()
         return EngineActionResult(phaseBefore, phase, changed = true)
     }
@@ -117,6 +138,7 @@ class MinesweeperEngine(
         flagCount = flagCount,
         remainingMineCount = config.mineCount - flagCount,
         revealedSafeCount = revealedSafeCount,
+        canUndo = phase == GamePhase.Lost && lossCheckpoint != null,
     )
 
     internal fun hasMineAt(position: CellPosition): Boolean = mines[geometry.indexOf(position)]
@@ -199,6 +221,17 @@ class MinesweeperEngine(
         phase = GamePhase.Lost
     }
 
+    private fun createCheckpoint() = EngineCheckpoint(
+        mines = mines.copyOf(),
+        adjacentMines = adjacentMines.copyOf(),
+        revealed = revealed.copyOf(),
+        marks = marks.copyOf(),
+        phase = phase,
+        flagCount = flagCount,
+        revealedSafeCount = revealedSafeCount,
+        detonatedIndex = detonatedIndex,
+    )
+
     private fun unchanged(phaseBefore: GamePhase) =
         EngineActionResult(phaseBefore, phase, changed = false)
 
@@ -206,4 +239,15 @@ class MinesweeperEngine(
         const val NO_CELL = -1
         val TERMINAL_PHASES = setOf(GamePhase.Won, GamePhase.Lost)
     }
+
+    private data class EngineCheckpoint(
+        val mines: BooleanArray,
+        val adjacentMines: IntArray,
+        val revealed: BooleanArray,
+        val marks: Array<Mark>,
+        val phase: GamePhase,
+        val flagCount: Int,
+        val revealedSafeCount: Int,
+        val detonatedIndex: Int,
+    )
 }
