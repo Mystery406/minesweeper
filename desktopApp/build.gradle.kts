@@ -10,6 +10,7 @@ dependencies {
     implementation(projects.shared)
 
     implementation(compose.desktop.currentOs)
+    implementation(libs.compose.components.resources)
 }
 
 compose.desktop {
@@ -20,6 +21,16 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "dev.hikari.minesweeper"
             packageVersion = "1.0.0"
+
+            windows {
+                iconFile.set(project.file("src/main/resources/app-icon.ico"))
+            }
+            linux {
+                iconFile.set(project.file("src/main/composeResources/drawable/app_icon.png"))
+            }
+            macOS {
+                iconFile.set(project.file("src/main/resources/app-icon.icns"))
+            }
         }
     }
 }
