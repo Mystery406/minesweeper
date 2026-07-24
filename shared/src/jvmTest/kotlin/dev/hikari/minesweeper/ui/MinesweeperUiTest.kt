@@ -29,6 +29,8 @@ import dev.hikari.minesweeper.session.GameIntent
 import dev.hikari.minesweeper.session.GamePreferences
 import dev.hikari.minesweeper.session.MinesweeperController
 import dev.hikari.minesweeper.session.SavedGamePreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -270,6 +272,8 @@ class MinesweeperUiTest {
 
     private fun controller(): MinesweeperController = MinesweeperController(
         preferences = MemoryPreferences(),
+        initialPreferences = SavedGamePreferences(),
+        persistenceScope = CoroutineScope(Dispatchers.Unconfined),
         clock = GameClock { 0L },
         layoutGenerator = MineLayoutGenerator { config -> IntArray(config.mineCount) { it } },
     )
@@ -285,10 +289,10 @@ class MinesweeperUiTest {
     }
 
     private class MemoryPreferences : GamePreferences {
-        override fun load() = SavedGamePreferences()
-        override fun saveSelectedDifficulty(value: Difficulty) = Unit
-        override fun saveCustomConfig(value: BoardConfig) = Unit
-        override fun saveBestTime(difficulty: Difficulty, seconds: Int) = Unit
-        override fun resetBestTimes() = Unit
+        override suspend fun load() = SavedGamePreferences()
+        override suspend fun saveSelectedDifficulty(value: Difficulty) = Unit
+        override suspend fun saveCustomGame(value: BoardConfig) = Unit
+        override suspend fun saveBestTime(difficulty: Difficulty, seconds: Int) = Unit
+        override suspend fun resetBestTimes() = Unit
     }
 }

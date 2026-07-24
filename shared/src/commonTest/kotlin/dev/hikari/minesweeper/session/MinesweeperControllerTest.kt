@@ -5,6 +5,8 @@ import dev.hikari.minesweeper.game.CellPosition
 import dev.hikari.minesweeper.game.Difficulty
 import dev.hikari.minesweeper.game.GamePhase
 import dev.hikari.minesweeper.game.MineLayoutGenerator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -182,8 +184,8 @@ class MinesweeperControllerTest {
     }
 
     private fun fixture(
-        saved: SavedGamePreferences = SavedGamePreferences(),
-        preferences: FakePreferences = FakePreferences(saved),
+        saved: SavedGamePreferences? = null,
+        preferences: FakePreferences = FakePreferences(saved ?: SavedGamePreferences()),
     ): Fixture {
         val clock = FakeClock()
         val mineIndices: (BoardConfig) -> Set<Int> = { config ->
@@ -191,6 +193,8 @@ class MinesweeperControllerTest {
         }
         val controller = MinesweeperController(
             preferences = preferences,
+            initialPreferences = saved ?: preferences.initialPreferences,
+            persistenceScope = CoroutineScope(Dispatchers.Unconfined),
             clock = clock,
             layoutGenerator = MineLayoutGenerator { config ->
                 mineIndices(config).toIntArray()
@@ -213,28 +217,29 @@ class MinesweeperControllerTest {
     }
 
     private class FakePreferences(
-        private var saved: SavedGamePreferences = SavedGamePreferences(),
+        val initialPreferences: SavedGamePreferences = SavedGamePreferences(),
     ) : GamePreferences {
         var selectedDifficulty: Difficulty? = null
         var customConfig: BoardConfig? = null
         val savedBestTimes = mutableListOf<Pair<Difficulty, Int>>()
         var resetCount = 0
 
-        override fun load(): SavedGamePreferences = saved
+        override suspend fun load(): SavedGamePreferences = initialPreferences
 
-        override fun saveSelectedDifficulty(value: Difficulty) {
+        override suspend fun saveSelectedDifficulty(value: Difficulty) {
             selectedDifficulty = value
         }
 
-        override fun saveCustomConfig(value: BoardConfig) {
+        override suspend fun saveCustomGame(value: BoardConfig) {
             customConfig = value
+            selectedDifficulty = Difficulty.Custom
         }
 
-        override fun saveBestTime(difficulty: Difficulty, seconds: Int) {
+        override suspend fun saveBestTime(difficulty: Difficulty, seconds: Int) {
             savedBestTimes += difficulty to seconds
         }
 
-        override fun resetBestTimes() {
+        override suspend fun resetBestTimes() {
             resetCount += 1
         }
     }

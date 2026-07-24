@@ -1,8 +1,17 @@
 package dev.hikari.minesweeper.session
 
-import com.russhwolf.settings.MapSettings
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.hikari.minesweeper.game.BoardConfig
 import dev.hikari.minesweeper.game.Difficulty
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,16 +19,18 @@ import kotlin.test.assertNull
 
 class GamePreferencesTest {
     @Test
-    fun missingAndInvalidValuesFallBackSafely() {
-        val settings = MapSettings(
-            "minesweeper.v1.selectedDifficulty" to "Unknown",
-            "minesweeper.v1.custom.width" to 2,
-            "minesweeper.v1.custom.height" to 99,
-            "minesweeper.v1.custom.mines" to 900,
-            "minesweeper.v1.best.Beginner" to -1,
+    fun missingAndInvalidValuesFallBackSafely() = runTest {
+        val dataStore = InMemoryPreferencesDataStore(
+            mutablePreferencesOf(
+                stringPreferencesKey("minesweeper.v1.selectedDifficulty") to "Unknown",
+                intPreferencesKey("minesweeper.v1.custom.width") to 2,
+                intPreferencesKey("minesweeper.v1.custom.height") to 99,
+                intPreferencesKey("minesweeper.v1.custom.mines") to 900,
+                intPreferencesKey("minesweeper.v1.best.Beginner") to -1,
+            ),
         )
 
-        val saved = SettingsGamePreferences(settings).load()
+        val saved = DataStoreGamePreferences(dataStore).load()
 
         assertEquals(Difficulty.Beginner, saved.selectedDifficulty)
         assertEquals(BoardConfig.DEFAULT_CUSTOM, saved.customConfig)
@@ -27,13 +38,11 @@ class GamePreferencesTest {
     }
 
     @Test
-    fun validValuesAndZeroSecondRecordRoundTrip() {
-        val settings = MapSettings()
-        val preferences = SettingsGamePreferences(settings)
+    fun validValuesAndZeroSecondRecordRoundTrip() = runTest {
+        val preferences = DataStoreGamePreferences(InMemoryPreferencesDataStore())
         val custom = BoardConfig(30, 24, 668)
 
-        preferences.saveSelectedDifficulty(Difficulty.Custom)
-        preferences.saveCustomConfig(custom)
+        preferences.saveCustomGame(custom)
         preferences.saveBestTime(Difficulty.Beginner, 0)
 
         val saved = preferences.load()
@@ -43,12 +52,10 @@ class GamePreferencesTest {
     }
 
     @Test
-    fun resettingRecordsPreservesSelectionAndCustomValues() {
-        val settings = MapSettings()
-        val preferences = SettingsGamePreferences(settings)
+    fun resettingRecordsPreservesSelectionAndCustomValues() = runTest {
+        val preferences = DataStoreGamePreferences(InMemoryPreferencesDataStore())
         val custom = BoardConfig(12, 12, 20)
-        preferences.saveSelectedDifficulty(Difficulty.Custom)
-        preferences.saveCustomConfig(custom)
+        preferences.saveCustomGame(custom)
         preferences.saveBestTime(Difficulty.Beginner, 12)
         preferences.saveBestTime(Difficulty.Intermediate, 34)
 
@@ -59,5 +66,20 @@ class GamePreferencesTest {
         assertEquals(custom, saved.customConfig)
         assertNull(saved.bestTimes[Difficulty.Beginner])
         assertNull(saved.bestTimes[Difficulty.Intermediate])
+    }
+
+    private class InMemoryPreferencesDataStore(
+        initialPreferences: Preferences = mutablePreferencesOf(),
+    ) : DataStore<Preferences> {
+        private val state = MutableStateFlow(initialPreferences)
+        private val mutex = Mutex()
+
+        override val data: Flow<Preferences> = state
+
+        override suspend fun updateData(
+            transform: suspend (t: Preferences) -> Preferences,
+        ): Preferences = mutex.withLock {
+            transform(state.value).also { updated -> state.value = updated }
+        }
     }
 }

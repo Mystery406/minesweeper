@@ -1,5 +1,8 @@
 package dev.hikari.minesweeper
 
 import androidx.compose.ui.window.ComposeUIViewController
+import dev.hikari.minesweeper.session.createGamePreferences
 
-fun MainViewController() = ComposeUIViewController { App() }
+private val gamePreferences = createGamePreferences()
+
+fun MainViewController() = ComposeUIViewController { App(gamePreferences) }

@@ -1,9 +1,14 @@
 package dev.hikari.minesweeper.session
 
-import com.russhwolf.settings.Settings
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.hikari.minesweeper.game.BoardConfig
 import dev.hikari.minesweeper.game.CustomConfigValidation
 import dev.hikari.minesweeper.game.Difficulty
+import kotlinx.coroutines.flow.first
 
 data class SavedGamePreferences(
     val selectedDifficulty: Difficulty = Difficulty.Beginner,
@@ -12,32 +17,33 @@ data class SavedGamePreferences(
 )
 
 interface GamePreferences {
-    fun load(): SavedGamePreferences
-    fun saveSelectedDifficulty(value: Difficulty)
-    fun saveCustomConfig(value: BoardConfig)
-    fun saveBestTime(difficulty: Difficulty, seconds: Int)
-    fun resetBestTimes()
+    suspend fun load(): SavedGamePreferences
+    suspend fun saveSelectedDifficulty(value: Difficulty)
+    suspend fun saveCustomGame(value: BoardConfig)
+    suspend fun saveBestTime(difficulty: Difficulty, seconds: Int)
+    suspend fun resetBestTimes()
 }
 
-class SettingsGamePreferences(
-    private val settings: Settings = Settings(),
+internal class DataStoreGamePreferences(
+    private val dataStore: DataStore<Preferences>,
 ) : GamePreferences {
-    override fun load(): SavedGamePreferences {
-        val selectedDifficulty = settings.getStringOrNull(Keys.SELECTED_DIFFICULTY)
+    override suspend fun load(): SavedGamePreferences {
+        val preferences = dataStore.data.first()
+        val selectedDifficulty = preferences[Keys.SELECTED_DIFFICULTY]
             ?.let { stored -> Difficulty.entries.firstOrNull { it.name == stored } }
             ?: Difficulty.Beginner
 
         val storedCustom = BoardConfig.validateCustom(
-            width = settings.getInt(Keys.CUSTOM_WIDTH, BoardConfig.DEFAULT_CUSTOM.width),
-            height = settings.getInt(Keys.CUSTOM_HEIGHT, BoardConfig.DEFAULT_CUSTOM.height),
-            mineCount = settings.getInt(Keys.CUSTOM_MINES, BoardConfig.DEFAULT_CUSTOM.mineCount),
+            width = preferences[Keys.CUSTOM_WIDTH] ?: BoardConfig.DEFAULT_CUSTOM.width,
+            height = preferences[Keys.CUSTOM_HEIGHT] ?: BoardConfig.DEFAULT_CUSTOM.height,
+            mineCount = preferences[Keys.CUSTOM_MINES] ?: BoardConfig.DEFAULT_CUSTOM.mineCount,
         )
         val customConfig = (storedCustom as? CustomConfigValidation.Valid)?.config
             ?: BoardConfig.DEFAULT_CUSTOM
 
         val bestTimes = buildMap {
             PRESET_DIFFICULTIES.forEach { difficulty ->
-                settings.getIntOrNull(Keys.bestTime(difficulty))
+                preferences[Keys.bestTime(difficulty)]
                     ?.takeIf { it >= 0 }
                     ?.let { put(difficulty, it) }
             }
@@ -45,35 +51,49 @@ class SettingsGamePreferences(
         return SavedGamePreferences(selectedDifficulty, customConfig, bestTimes)
     }
 
-    override fun saveSelectedDifficulty(value: Difficulty) {
-        settings.putString(Keys.SELECTED_DIFFICULTY, value.name)
+    override suspend fun saveSelectedDifficulty(value: Difficulty) {
+        dataStore.edit { preferences ->
+            preferences[Keys.SELECTED_DIFFICULTY] = value.name
+        }
     }
 
-    override fun saveCustomConfig(value: BoardConfig) {
+    override suspend fun saveCustomGame(value: BoardConfig) {
         val validation = BoardConfig.validateCustom(value.width, value.height, value.mineCount)
         require(validation is CustomConfigValidation.Valid) { "Only valid Custom settings can be saved." }
-        settings.putInt(Keys.CUSTOM_WIDTH, value.width)
-        settings.putInt(Keys.CUSTOM_HEIGHT, value.height)
-        settings.putInt(Keys.CUSTOM_MINES, value.mineCount)
+        dataStore.edit { preferences ->
+            preferences[Keys.SELECTED_DIFFICULTY] = Difficulty.Custom.name
+            preferences[Keys.CUSTOM_WIDTH] = value.width
+            preferences[Keys.CUSTOM_HEIGHT] = value.height
+            preferences[Keys.CUSTOM_MINES] = value.mineCount
+        }
     }
 
-    override fun saveBestTime(difficulty: Difficulty, seconds: Int) {
+    override suspend fun saveBestTime(difficulty: Difficulty, seconds: Int) {
         require(difficulty in PRESET_DIFFICULTIES) { "Custom games do not have best times." }
         require(seconds >= 0) { "Best time cannot be negative." }
-        settings.putInt(Keys.bestTime(difficulty), seconds)
+        dataStore.edit { preferences ->
+            preferences[Keys.bestTime(difficulty)] = seconds
+        }
     }
 
-    override fun resetBestTimes() {
-        PRESET_DIFFICULTIES.forEach { settings.remove(Keys.bestTime(it)) }
+    override suspend fun resetBestTimes() {
+        dataStore.edit { preferences ->
+            PRESET_DIFFICULTIES.forEach { difficulty ->
+                val key = Keys.bestTime(difficulty)
+                if (preferences[key] != null) {
+                    preferences.remove(key)
+                }
+            }
+        }
     }
 
     private object Keys {
         private const val PREFIX = "minesweeper.v1."
-        const val SELECTED_DIFFICULTY = "${PREFIX}selectedDifficulty"
-        const val CUSTOM_WIDTH = "${PREFIX}custom.width"
-        const val CUSTOM_HEIGHT = "${PREFIX}custom.height"
-        const val CUSTOM_MINES = "${PREFIX}custom.mines"
-        fun bestTime(difficulty: Difficulty) = "${PREFIX}best.${difficulty.name}"
+        val SELECTED_DIFFICULTY = stringPreferencesKey("${PREFIX}selectedDifficulty")
+        val CUSTOM_WIDTH = intPreferencesKey("${PREFIX}custom.width")
+        val CUSTOM_HEIGHT = intPreferencesKey("${PREFIX}custom.height")
+        val CUSTOM_MINES = intPreferencesKey("${PREFIX}custom.mines")
+        fun bestTime(difficulty: Difficulty) = intPreferencesKey("${PREFIX}best.${difficulty.name}")
     }
 }
 

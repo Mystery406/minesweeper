@@ -14,6 +14,9 @@ import dev.hikari.minesweeper.game.MineLayoutGenerator
 import dev.hikari.minesweeper.game.MinesweeperEngine
 import dev.hikari.minesweeper.game.RandomMineLayoutGenerator
 import dev.hikari.minesweeper.game.boardConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 
 sealed interface GameIntent {
     data class Reveal(val position: CellPosition) : GameIntent
@@ -58,10 +61,12 @@ data class GameUiState(
 
 class MinesweeperController(
     private val preferences: GamePreferences,
+    initialPreferences: SavedGamePreferences,
+    private val persistenceScope: CoroutineScope,
     private val clock: GameClock = MonotonicGameClock(),
     private val layoutGenerator: MineLayoutGenerator = RandomMineLayoutGenerator(),
 ) {
-    private val saved = preferences.load()
+    private val saved = initialPreferences
     private var selectedDifficulty = saved.selectedDifficulty
     private var customConfig = saved.customConfig
     private var bestTimes = saved.bestTimes.toMutableMap()
@@ -131,7 +136,7 @@ class MinesweeperController(
 
     private fun selectDifficulty(difficulty: Difficulty) {
         selectedDifficulty = difficulty
-        preferences.saveSelectedDifficulty(difficulty)
+        persist { saveSelectedDifficulty(difficulty) }
         engine = createEngine(difficulty.boardConfig(customConfig))
         startedAtMillis = null
         elapsedSeconds = 0
@@ -145,8 +150,7 @@ class MinesweeperController(
 
         customConfig = validation.config
         selectedDifficulty = Difficulty.Custom
-        preferences.saveCustomConfig(customConfig)
-        preferences.saveSelectedDifficulty(selectedDifficulty)
+        persist { saveCustomGame(customConfig) }
         engine = createEngine(customConfig)
         startedAtMillis = null
         elapsedSeconds = 0
@@ -162,7 +166,7 @@ class MinesweeperController(
     }
 
     private fun resetBestTimes() {
-        preferences.resetBestTimes()
+        persist { resetBestTimes() }
         bestTimes.clear()
         publish()
     }
@@ -179,7 +183,13 @@ class MinesweeperController(
         val previous = bestTimes[selectedDifficulty]
         if (previous == null || elapsedSeconds < previous) {
             bestTimes[selectedDifficulty] = elapsedSeconds
-            preferences.saveBestTime(selectedDifficulty, elapsedSeconds)
+            persist { saveBestTime(selectedDifficulty, elapsedSeconds) }
+        }
+    }
+
+    private fun persist(block: suspend GamePreferences.() -> Unit) {
+        persistenceScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            preferences.block()
         }
     }
 

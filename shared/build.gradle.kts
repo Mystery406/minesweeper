@@ -67,12 +67,12 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
+            implementation(libs.androidx.datastore.preferences.core)
             implementation(libs.kotlinx.coroutinesCore)
-            implementation(libs.multiplatform.settings.noArg)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            implementation(libs.multiplatform.settings.test)
+            implementation(libs.kotlinx.coroutinesTest)
         }
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)
