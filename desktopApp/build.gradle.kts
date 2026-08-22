@@ -19,7 +19,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "dev.hikari.minesweeper"
+            packageName = "Minesweeper"
             packageVersion = "1.0.0"
 
             windows {
