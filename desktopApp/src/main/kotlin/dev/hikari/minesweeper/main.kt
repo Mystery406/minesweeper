@@ -1,6 +1,8 @@
 package dev.hikari.minesweeper
 
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.unit.dp
@@ -17,7 +19,11 @@ fun main() {
             onCloseRequest = ::exitApplication,
             title = "Minesweeper",
             icon = painterResource(Res.drawable.app_icon),
-            state = rememberWindowState(width = 920.dp, height = 680.dp),
+            state = rememberWindowState(
+                position = WindowPosition(Alignment.Center),
+                width = 920.dp,
+                height = 680.dp,
+            ),
         ) {
             window.minimumSize = Dimension(360, 420)
             App(gamePreferences)
