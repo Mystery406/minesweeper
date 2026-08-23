@@ -3,6 +3,7 @@ package dev.hikari.minesweeper.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -107,6 +108,30 @@ class MinesweeperUiTest {
             updatePointerTo(center)
             press(MouseButton.Secondary)
             advanceEventTime(60)
+            release(MouseButton.Secondary)
+        }
+        waitForIdle()
+
+        assertEquals(
+            Mark.Flag,
+            (controller.state.cellAt(CellPosition(2, 2)) as CellViewState.Covered).mark,
+        )
+    }
+
+    @Test
+    fun secondaryMouseButtonIsHandledOnceAcrossRecomposition() = runComposeUiTest {
+        val controller = controller()
+        setContent { MinesweeperScreen(controller) }
+        val cell = onNodeWithTag("cell_2_2")
+
+        cell.performMouseInput {
+            updatePointerTo(center)
+            press(MouseButton.Secondary)
+        }
+        waitForIdle()
+
+        cell.performMouseInput {
+            moveBy(Offset(1f, 0f))
             release(MouseButton.Secondary)
         }
         waitForIdle()
